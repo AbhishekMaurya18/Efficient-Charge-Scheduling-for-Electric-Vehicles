@@ -246,7 +246,7 @@ int main()
     }
     
     reserve();
-    //cout<<int(8.7*10)-int(6.5*10);
+    
     return 0;
 }
 
