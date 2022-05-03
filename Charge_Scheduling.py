@@ -14,6 +14,7 @@ from skfuzzy import control as ctrl
 
 s_map = defaultdict(list)
 v_map = defaultdict(list)
+reserve_map = defaultdict(list)
 
 
 # Constants from the spec
@@ -331,6 +332,12 @@ def wait_count(index, message, requests):
         s_id = solver[0][0]
         wt = request[v_id - 1][4] / s_id.roc  # time to charge vehicle vid at station sid
 
+        # fill reserve map
+        reserve_map.clear()
+        reserve_map[v_id].append([s_id.sid, len(s_id.queue), solver[0][2], solver[0][1]])
+        # print('reservation map : ', end=' ')
+        # print(reserve_map)
+
         if len(s_id.queue) > 0:
             wt += s_id.queue[-1][1]
 
@@ -343,10 +350,11 @@ def wait_count(index, message, requests):
         s_id = station[i]
 
         if len(s_id.queue):
-            wait.append(len(s_id.queue) - 1)  # -1, since first vehicle is not waiting
+            wait.append(len(s_id.queue)-1)  # -1, since first vehicle is not waiting
         else:
             wait.append(0)
 
+    print('wait', end=" ")
     print(wait)
 
     # dataset is wait list
@@ -368,71 +376,70 @@ def wait_count(index, message, requests):
 
 
 def fuzzy_logic_wq_dist_cost(wql, d, price):
-    wait = ctrl.Antecedent(np.arange(0, 60, 1), 'waiting queue length')
-    dist = ctrl.Antecedent(np.arange(0, 100, 1), 'distance')
-    cost = ctrl.Antecedent(np.arange(8, 16, 0.2), 'cost')
+    wait = ctrl.Antecedent(np.arange(0, 11, 1), 'waiting queue length')
+    dist = ctrl.Antecedent(np.arange(0, 200, .1), 'distance')
+    cost = ctrl.Antecedent(np.arange(6, 11, 0.1), 'cost')
     result = ctrl.Consequent(np.arange(0, 101, 1), 'result')
 
-    wait['poor'] = fuzz.trimf(wait.universe, [0, 0, 25])
-    wait['average'] = fuzz.trimf(wait.universe, [8, 25, 45])
-    wait['good'] = fuzz.trimf(wait.universe, [30, 60, 60])
+    wait['low'] = fuzz.trimf(wait.universe, [0, 0, 5])
+    wait['medium'] = fuzz.trimf(wait.universe, [1, 5, 9])
+    wait['high'] = fuzz.trimf(wait.universe, [5, 10, 10])
 
-    dist['poor'] = fuzz.trimf(dist.universe, [0, 25, 50])
-    dist['average'] = fuzz.trimf(dist.universe, [25, 50, 75])
-    dist['good'] = fuzz.trimf(dist.universe, [50, 75, 100])
+    dist['low'] = fuzz.trimf(dist.universe, [0, 0, 60])
+    dist['medium'] = fuzz.trimf(dist.universe, [30, 100, 170])
+    dist['high'] = fuzz.trimf(dist.universe, [75, 200, 200])
 
-    cost['poor'] = fuzz.trimf(cost.universe, [8, 10, 12])
-    cost['average'] = fuzz.trimf(cost.universe, [10, 12, 14])
-    cost['good'] = fuzz.trimf(cost.universe, [12, 14, 16])
+    cost['low'] = fuzz.trimf(cost.universe, [6, 6, 7.8])
+    cost['medium'] = fuzz.trimf(cost.universe, [6.3, 8, 9.5])
+    cost['high'] = fuzz.trimf(cost.universe, [8, 10, 10])
 
     result['low'] = fuzz.trimf(result.universe, [0, 25, 50])
-    result['medium'] = fuzz.trimf(result.universe, [25, 50, 75])
+    result['medium'] = fuzz.trimf(result.universe, [20, 50, 80])
     result['high'] = fuzz.trimf(result.universe, [50, 100, 100])
 
-    # wait['average'].view()
-    # cost['average'].view()
-    # dist['average'].view()
+    # wait['medium'].view()
+    # cost['medium'].view()
+    # dist['medium'].view()
     #
     # result.view()
 
-    rule1 = ctrl.Rule(wait['poor'] & (cost['poor'] | dist['poor']), result['high'])
-    rule2 = ctrl.Rule(wait['poor'] & (cost['poor'] | dist['average']), result['high'])
-    rule3 = ctrl.Rule(wait['poor'] & (cost['poor'] | dist['good']), result['high'])
+    rule1 = ctrl.Rule(wait['low'], result['high'])
+    # rule2 = ctrl.Rule(wait['low'] & cost['low'] & dist['medium'], result['high'])
+    # rule3 = ctrl.Rule(wait['low'] & cost['low'] & dist['high'], result['high'])
+    #
+    # rule4 = ctrl.Rule(wait['low'] & cost['medium'] & dist['low'], result['high'])
+    # rule5 = ctrl.Rule(wait['low'] & cost['medium'] & dist['medium'], result['high'])
+    # rule6 = ctrl.Rule(wait['low'] & cost['medium'] & dist['high'], result['high'])
+    #
+    # rule7 = ctrl.Rule(wait['low'] & (cost['high'] | dist['low']), result['high'])
+    # rule8 = ctrl.Rule(wait['low'] & cost['high'] & dist['medium'], result['high'])
+    # rule9 = ctrl.Rule(wait['low'] & cost['high'] & dist['high'], result['high'])
 
-    rule4 = ctrl.Rule(wait['poor'] & (cost['average'] | dist['poor']), result['high'])
-    rule5 = ctrl.Rule(wait['poor'] & (cost['average'] | dist['average']), result['high'])
-    rule6 = ctrl.Rule(wait['poor'] & cost['average'] & dist['good'], result['high'])
+    rule10 = ctrl.Rule(wait['medium'] & cost['low'], result['high'])
+    # rule11 = ctrl.Rule(wait['medium'] & cost['low'] & dist['medium'], result['medium'])
+    # rule12 = ctrl.Rule(wait['medium'] & cost['low'] & dist['high'], result['medium'])
 
-    rule7 = ctrl.Rule(wait['poor'] & (cost['good'] | dist['poor']), result['high'])
-    rule8 = ctrl.Rule(wait['poor'] & cost['good'] & dist['average'], result['high'])
-    rule9 = ctrl.Rule(wait['poor'] & cost['good'] & dist['good'], result['high'])
+    rule13 = ctrl.Rule(wait['medium'] & cost['medium'], result['medium'])
+    # rule14 = ctrl.Rule(wait['medium'] & cost['medium'] & dist['medium'], result['medium'])
+    # rule15 = ctrl.Rule(wait['medium'] & cost['medium'] & dist['high'], result['medium'])
 
-    rule10 = ctrl.Rule(wait['average'] & cost['poor'] & dist['poor'], result['high'])
-    rule11 = ctrl.Rule(wait['average'] & cost['poor'] & dist['average'], result['medium'])
-    rule12 = ctrl.Rule(wait['average'] & cost['poor'] & dist['good'], result['medium'])
+    rule16 = ctrl.Rule(wait['medium'] & cost['high'] & dist['low'], result['medium'])
+    rule17 = ctrl.Rule(wait['medium'] & cost['high'] & dist['medium'], result['medium'])
+    rule18 = ctrl.Rule(wait['medium'] & cost['high'] & dist['high'], result['medium'])
 
-    rule13 = ctrl.Rule(wait['average'] & cost['average'] & dist['poor'], result['medium'])
-    rule14 = ctrl.Rule(wait['average'] & cost['average'] & dist['average'], result['medium'])
-    rule15 = ctrl.Rule(wait['average'] & cost['average'] & dist['good'], result['medium'])
+    rule19 = ctrl.Rule(wait['high'] & cost['low'], result['low'])
+    # rule20 = ctrl.Rule(wait['high'] & cost['low'] & dist['medium'], result['low'])
+    # rule21 = ctrl.Rule(wait['high'] & cost['low'] & dist['high'], result['low'])
 
-    rule16 = ctrl.Rule(wait['average'] & cost['good'] & dist['poor'], result['medium'])
-    rule17 = ctrl.Rule(wait['average'] & cost['good'] & dist['average'], result['medium'])
-    rule18 = ctrl.Rule(wait['average'] & cost['good'] & dist['good'], result['low'])
+    rule22 = ctrl.Rule(wait['high'] & cost['medium'] & dist['low'], result['low'])
+    rule23 = ctrl.Rule(wait['high'] & cost['medium'] & dist['medium'], result['low'])
+    rule24 = ctrl.Rule(wait['high'] & cost['medium'] & dist['high'], result['low'])
 
-    rule19 = ctrl.Rule(wait['good'] & cost['poor'] & dist['poor'], result['low'])
-    rule20 = ctrl.Rule(wait['good'] & cost['poor'] & dist['average'], result['low'])
-    rule21 = ctrl.Rule(wait['good'] & cost['poor'] & dist['good'], result['low'])
+    rule25 = ctrl.Rule(wait['high'] & cost['high'] & dist['low'], result['low'])
+    rule26 = ctrl.Rule(wait['high'] & cost['high'] & dist['medium'], result['low'])
+    rule27 = ctrl.Rule(wait['high'] & cost['high'] & dist['high'], result['low'])
 
-    rule22 = ctrl.Rule(wait['good'] & cost['average'] & dist['poor'], result['low'])
-    rule23 = ctrl.Rule(wait['good'] & cost['average'] & dist['average'], result['low'])
-    rule24 = ctrl.Rule(wait['good'] & cost['average'] & dist['good'], result['low'])
-
-    rule25 = ctrl.Rule(wait['good'] & cost['good'] & dist['poor'], result['low'])
-    rule26 = ctrl.Rule(wait['good'] & cost['good'] & dist['average'], result['low'])
-    rule27 = ctrl.Rule(wait['good'] & cost['good'] & dist['good'], result['low'])
-
-    result_ctrl = ctrl.ControlSystem([rule1, rule2, rule3, rule4, rule5, rule6, rule7, rule8, rule9, rule10, rule11,
-                                      rule12, rule13, rule14, rule15, rule16, rule17, rule18, rule19, rule20, rule21,
+    result_ctrl = ctrl.ControlSystem([rule1, rule10, rule13, rule16, rule17, rule18, rule19,
                                       rule22, rule23, rule24, rule25, rule26, rule27])
 
     res = ctrl.ControlSystemSimulation(result_ctrl)
@@ -443,6 +450,7 @@ def fuzzy_logic_wq_dist_cost(wql, d, price):
     res.compute()
 
     # print(res.output['result'])
+    # round of the result to two decimal places
     output = "{0:.2f}".format(res.output['result'])
 
     # result.view(sim=res)
@@ -482,17 +490,52 @@ def fuzzy_wait_count(index, x):
             ans = 0
             if x == 4:
                 ans = fuzzy_logic_wq_dist_cost(len(element[0].queue), element[1], element[2])  # fuzzy function call
-            support_vec.append([element[0], ans])
+            support_vec.append([element[0], int(float(ans)*100), element[1]]) # convert string to float multiply by 100 and make int
 
-        support_vec.sort(key=lambda y: y[1])
+        support_vec.sort(key=lambda y : y[1], reverse=True)
 
         # print(solver)
 
         size = len(solver)
 
+        wt = 0
+        #
+        # # deals with equal fuzzy logic membership degree
+        #
+        # min_wql = []
+        # membership_degree = support_vec[0][1]
+        # min_wql.append([support_vec[0][0], len(support_vec[0][0].queue), support_vec[0][2]])  # one of the maximum membership degree station wql
+        #
+        # for sid, m_value, d in support_vec[1:]:
+        #     if m_value == membership_degree:
+        #         min_wql.append([sid, len(sid.queue), d])
+        #     else:
+        #         break
+        #
+        # min_wql.sort(key=lambda a : a[1])
+        #
+        # # in case wql is also same  choose minimum cost
+        # min_cost = []
+        # min_cost.append([min_wql[0][0], min_wql[0][1], min_wql[0][2], min_wql[0][0].coc])
+        # minimum_wql = min_cost[0][0].queue
+        #
+        # for sid, q_value, d in min_wql[1:]:
+        #     if q_value == minimum_wql:
+        #         min_cost.append([sid, len(sid.queue), d, sid.coc])
+        #     else:
+        #         break
+        #
+        # min_cost.sort(key=lambda a: a[3])
+
         # insert reserved vehicle vid in waiting queue at station sid.id
-        s_id = support_vec[-1][0]
-        wt = 0    # request[v_id - 1][4] / s_id.roc, time to charge vehicle vid at station sid
+        s_id = support_vec[0][0]
+        wt = request[v_id - 1][4] / s_id.roc  # time to charge vehicle vid at station sid
+
+        # fill reserve map
+        reserve_map.clear()
+        reserve_map[v_id].append([s_id.sid, len(s_id.queue), s_id.coc, support_vec[0][2]])
+        # print('reservation map : ', end=' ')
+        # print(reserve_map)
 
         if len(s_id.queue) > 0:
             wt += s_id.queue[-1][1]
@@ -506,7 +549,7 @@ def fuzzy_wait_count(index, x):
         s_id = station[i]
 
         if len(s_id.queue):
-            wait.append(len(s_id.queue) - 1)  # -1, since first vehicle is not waiting
+            wait.append(len(s_id.queue)-1)  # -1, since first vehicle is not waiting
         else:
             wait.append(0)
 
@@ -554,38 +597,38 @@ def plot_line_chart(wq1, wq2, wq3, wq4):
 if __name__ == "__main__":
 
     # creating station specification
-    s1 = Station(1, 19.2514, 72.8519, 131.0, 9.5)
-    s2 = Station(2, 19.1330, 73.2297, 159.0, 11.5)
-    s3 = Station(3, 19.2016, 73.1202, 133.0, 12.1)
-    s4 = Station(4, 19.3760, 72.8777, 143.0, 10.4)
-    s5 = Station(5, 19.4013, 72.5483, 105.0, 13.5)
-    s6 = Station(6, 19.1179, 72.7631, 175.0, 14.2)
-    s7 = Station(7, 19.1964, 72.5296, 153.0, 15.2)
-    s8 = Station(8, 19.0196, 72.5295, 106.0, 10.7)
-    s9 = Station(9, 19.0186, 73.1174, 114.0, 11.1)
-    s10 = Station(10, 19.3075, 72.6263, 116.0, 12)
+    s1 = Station(1, 19.2514, 72.8519, 131.0, 6.5)
+    s2 = Station(2, 19.1330, 73.2297, 159.0, 7.5)
+    s3 = Station(3, 19.2016, 73.1202, 133.0, 8.1)
+    s4 = Station(4, 19.3760, 72.8777, 143.0, 7.4)
+    s5 = Station(5, 19.4013, 72.5483, 105.0, 9.5)
+    s6 = Station(6, 19.1179, 72.7631, 175.0, 8.2)
+    s7 = Station(7, 19.1964, 72.5296, 153.0, 7.2)
+    s8 = Station(8, 19.0196, 72.5295, 106.0, 8.7)
+    s9 = Station(9, 19.0186, 73.1174, 114.0, 9.1)
+    s10 = Station(10, 19.3075, 72.6263, 116.0, 9.8)
 
-    s11 = Station(11, 19.1414, 72.8519, 131.0, 11.5)
-    s12 = Station(12, 19.1430, 73.0097, 159.0, 10.5)
-    s13 = Station(13, 19.3116, 72.9802, 133.0, 12.1)
-    s14 = Station(14, 19.2560, 72.6777, 143.0, 10.4)
-    s15 = Station(15, 19.2013, 72.9583, 105.0, 14.5)
-    s16 = Station(16, 19.2279, 72.7631, 175.0, 15.2)
-    s17 = Station(17, 19.3364, 72.5396, 153.0, 15.2)
+    s11 = Station(11, 19.1414, 72.8519, 131.0, 6.5)
+    s12 = Station(12, 19.1430, 73.0097, 159.0, 7.5)
+    s13 = Station(13, 19.3116, 72.9802, 133.0, 8.1)
+    s14 = Station(14, 19.2560, 72.6777, 143.0, 7.3)
+    s15 = Station(15, 19.2013, 72.9583, 105.0, 7.5)
+    s16 = Station(16, 19.2279, 72.7631, 175.0, 7.2)
+    s17 = Station(17, 19.3364, 72.5396, 153.0, 8.2)
     s18 = Station(18, 19.1096, 72.6395, 106.0, 8.7)
-    s19 = Station(19, 19.1286, 73.1174, 114.0, 11.1)
-    s20 = Station(20, 19.3675, 72.6863, 116.0, 12)
+    s19 = Station(19, 19.1286, 73.1174, 114.0, 7.1)
+    s20 = Station(20, 19.3675, 72.6863, 116.0, 9)
 
-    s21 = Station(21, 19.3614, 72.8219, 131.0, 12.5)
-    s22 = Station(22, 19.0730, 73.0827, 159.0, 13.5)
-    s23 = Station(23, 19.0916, 72.8802, 133.0, 11.1)
-    s24 = Station(24, 19.2660, 72.9777, 143.0, 10.4)
-    s25 = Station(25, 19.3113, 72.7483, 105.0, 9.5)
-    s26 = Station(26, 19.0279, 72.7531, 175.0, 14.2)
-    s27 = Station(27, 19.1264, 72.5296, 153.0, 12.2)
-    s28 = Station(28, 19.2696, 72.5195, 106.0, 10.7)
-    s29 = Station(29, 19.0206, 72.9274, 114.0, 11.1)
-    s30 = Station(30, 19.1875, 72.6163, 116.0, 14)
+    s21 = Station(21, 19.3614, 72.8219, 131.0, 7.5)
+    s22 = Station(22, 19.0730, 73.0827, 159.0, 7.4)
+    s23 = Station(23, 19.0916, 72.8802, 133.0, 8.1)
+    s24 = Station(24, 19.2660, 72.9777, 143.0, 7.4)
+    s25 = Station(25, 19.3113, 72.7483, 105.0, 6.6)
+    s26 = Station(26, 19.0279, 72.7531, 175.0, 9.2)
+    s27 = Station(27, 19.1264, 72.5296, 153.0, 7.2)
+    s28 = Station(28, 19.2696, 72.5195, 106.0, 6.7)
+    s29 = Station(29, 19.0206, 72.9274, 114.0, 8.1)
+    s30 = Station(30, 19.1875, 72.6163, 116.0, 8.4)
 
     station = [s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, s16, s17, s18, s19, s20,
                s21, s22, s23, s24, s25, s26, s27, s28, s29, s30]
@@ -683,46 +726,46 @@ if __name__ == "__main__":
             # clear the waiting queue
             clear_wait_queue(station)
             print()
-        # elif x == 1:
-        #     reachable_station(request[:100])
-        #
-        #     # waiting queue length count
-        #     wl_100_wait = wait_count(3, "wait", 100)
-        #     clear_wait_queue(station)
-        #
-        #     wl_100_dist = wait_count(1, "distance", 100)  # 1 because in reachable station at index 1 time = dist/avg_speed is stored
-        #     clear_wait_queue(station)
-        #
-        #     wl_100_cost = wait_count(2, "cost", 100)  # 2 because in reachable station at index 2 cost of per unit charge is stored
-        #     clear_wait_queue(station)
-        #
-        #     wl_100_FL = fuzzy_wait_count(100, 4)
-        #
-        #     plot_line_chart(wl_100_wait, wl_100_dist, wl_100_cost, wl_100_FL)
-        #
-        #     # clear the waiting queue
-        #     clear_wait_queue(station)
-        #     print()
-        # else:
-        #     reachable_station(request[:])
-        #
-        #     # waiting queue length count
-        #     wl_150_wait = wait_count(3, "wait", 150)  # 3 because in reachable station at index 3 wait time is stored
-        #     clear_wait_queue(station)
-        #
-        #     wl_150_dist = wait_count(1, "distance", 150)  # 1 because in reachable station at index 1 time = dist/avg_speed is stored
-        #     clear_wait_queue(station)
-        #
-        #     wl_150_cost = wait_count(2, "cost", 150)  # # 2 because in reachable station at index 2 cost of per unit charge is stored
-        #     clear_wait_queue(station)
-        #
-        #     wl_150_FL = fuzzy_wait_count(150, 4)
-        #
-        #     plot_line_chart(wl_150_wait, wl_150_dist, wl_150_cost, wl_150_FL)
-        #     wl_150_dist = wait_count(1, "distance", 150)
-        #
-        #     # clear the waiting queue
-        #     clear_wait_queue(station)
+        elif x == 1:
+            reachable_station(request[:100])
+        
+            # waiting queue length count
+            wl_100_wait = wait_count(3, "wait", 100)
+            clear_wait_queue(station)
+        
+            wl_100_dist = wait_count(1, "distance", 100)  # 1 because in reachable station at index 1 time = dist/avg_speed is stored
+            clear_wait_queue(station)
+        
+            wl_100_cost = wait_count(2, "cost", 100)  # 2 because in reachable station at index 2 cost of per unit charge is stored
+            clear_wait_queue(station)
+        
+            wl_100_FL = fuzzy_wait_count(100, 4)
+        
+            plot_line_chart(wl_100_wait, wl_100_dist, wl_100_cost, wl_100_FL)
+            wl_100_FL = fuzzy_wait_count(100, 4)
+            # clear the waiting queue
+            clear_wait_queue(station)
+            print()
+        else:
+            reachable_station(request[:])
+        
+            # waiting queue length count
+            wl_150_wait = wait_count(3, "wait", 150)  # 3 because in reachable station at index 3 wait time is stored
+            clear_wait_queue(station)
+        
+            wl_150_dist = wait_count(1, "distance", 150)  # 1 because in reachable station at index 1 time = dist/avg_speed is stored
+            clear_wait_queue(station)
+        
+            wl_150_cost = wait_count(2, "cost", 150)  # # 2 because in reachable station at index 2 cost of per unit charge is stored
+            clear_wait_queue(station)
+        
+            wl_150_FL = fuzzy_wait_count(150, 4)
+        
+            plot_line_chart(wl_150_wait, wl_150_dist, wl_150_cost, wl_150_FL)
+            wl_150_dist = wait_count(1, "distance", 150)
+
+            # clear the waiting queue
+            # clear_wait_queue(station)
 
 
 
